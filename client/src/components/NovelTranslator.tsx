@@ -27,21 +27,32 @@ export default function NovelTranslator({
   initialBookNumber = '', 
   initialChapterNumber = ''
 }) {
+  // Check for pre-rendered data from static HTML
+  const hasPreRenderedData = typeof window !== 'undefined' && window.chapterData;
+  
   const [url, setUrl] = useState(initialUrl);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(!hasPreRenderedData);
   const [error, setError] = useState('');
-  const [chapter, setChapter] = useState<Chapter | null>(null);
-  const [showInitialMessage, setShowInitialMessage] = useState(!initialUrl);
+  const [chapter, setChapter] = useState<Chapter | null>(
+    hasPreRenderedData ? {
+      chapterTitle: window.chapterData!.chapterTitle,
+      translatedContent: '', // Will be fetched from API
+      prevChapter: window.chapterData!.prevChapter,
+      nextChapter: window.chapterData!.nextChapter,
+      isCached: true
+    } : null
+  );
+  const [showInitialMessage, setShowInitialMessage] = useState(!initialUrl && !hasPreRenderedData);
   
   // Translation progress state
   const [isTranslating, setIsTranslating] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [translationStatus, setTranslationStatus] = useState('Fetching content...');
+  const [progress, setProgress] = useState(hasPreRenderedData ? 100 : 0);
+  const [translationStatus, setTranslationStatus] = useState(hasPreRenderedData ? 'Loading pre-rendered content...' : 'Fetching content...');
   const [streamingContent, setStreamingContent] = useState('');
   
   // URL and permalink state
-  const [bookNumber, setBookNumber] = useState(initialBookNumber);
-  const [chapterNumber, setChapterNumber] = useState(initialChapterNumber);
+  const [bookNumber, setBookNumber] = useState(hasPreRenderedData ? window.chapterData!.bookNumber : initialBookNumber);
+  const [chapterNumber, setChapterNumber] = useState(hasPreRenderedData ? window.chapterData!.chapterNumber : initialChapterNumber);
   const [permalinkUrl, setPermalinkUrl] = useState('');
   
   const [, navigate] = useLocation();
@@ -177,8 +188,8 @@ export default function NovelTranslator({
                 setChapter({
                   chapterTitle: metadata.chapterTitle || 'Chapter',
                   translatedContent: fullContent,
-                  prevChapter: metadata.prevChapter,
-                  nextChapter: metadata.nextChapter
+                  prevChapter: metadata.prevChapter || null,
+                  nextChapter: metadata.nextChapter || null
                 });
                 setIsTranslating(false);
                 break;
@@ -205,11 +216,30 @@ export default function NovelTranslator({
     handleTranslation(newUrl);
   };
   
-  // Effect to handle initial URL or navigation
+  // Effect to handle initial URL, navigation, or pre-rendered data
   useEffect(() => {
-    if (initialUrl) {
+    if (hasPreRenderedData) {
+      // For pre-rendered data from static HTML
+      const bookNum = window.chapterData!.bookNumber;
+      const chapterNum = window.chapterData!.chapterNumber;
+      
+      // Set permalink URL
+      const permalink = `/${bookNum}/${chapterNum}.html`;
+      setPermalinkUrl(permalink);
+      
+      // Either load from cache or construct URL to fetch
+      const constructedUrl = `https://www.69shuba.com/txt/${bookNum}/${chapterNum}`;
+      setUrl(constructedUrl);
+      
+      // Fetch the content if not already cached
+      // This might be redundant if using SSR, but ensures content loads
+      setLoading(true);
+      handleTranslation(constructedUrl);
+    } 
+    else if (initialUrl) {
       handleTranslation(initialUrl);
-    } else if (initialBookNumber && initialChapterNumber) {
+    } 
+    else if (initialBookNumber && initialChapterNumber) {
       const constructedUrl = `https://www.69shuba.com/txt/${initialBookNumber}/${initialChapterNumber}`;
       setUrl(constructedUrl);
       handleTranslation(constructedUrl);

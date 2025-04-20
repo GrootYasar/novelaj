@@ -11,7 +11,8 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
-      <Route path="/:bookNumber/:chapterNumber" component={ChapterPage} />
+      <Route path="/:bookNumber([0-9]+)/:chapterNumber([0-9]+).html" component={ChapterPage} />
+      <Route path="/:bookNumber([0-9]+)/:chapterNumber([0-9]+)" component={ChapterPage} />
       <Route component={NotFound} />
     </Switch>
   );
