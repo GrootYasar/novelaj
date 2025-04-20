@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import express, { type Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import axios from 'axios';
@@ -7,6 +7,7 @@ import iconv from 'iconv-lite';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@supabase/supabase-js';
 import fs from 'fs/promises';
+import fsSync from 'fs';
 import path from 'path';
 
 // Initialize Supabase client if credentials are available
@@ -30,6 +31,32 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 const BASE_URL = 'https://www.69shuba.com';
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Serve static HTML files for chapters
+  const staticPath = path.join(process.cwd(), 'static');
+  if (fsSync.existsSync(staticPath)) {
+    app.use('/static', express.static(staticPath));
+    
+    // Route for chapter pages in the format /:bookNumber/:chapterNumber.html
+    app.get('/:bookNumber([0-9]+)/:chapterNumber([0-9]+).html', (req, res, next) => {
+      const { bookNumber, chapterNumber } = req.params;
+      const chapterPath = path.join(staticPath, bookNumber, `${chapterNumber}.html`);
+      
+      // Check if the file exists
+      try {
+        if (fsSync.existsSync(chapterPath)) {
+          // File exists, serve it
+          res.sendFile(chapterPath);
+        } else {
+          // File doesn't exist, pass to next handler
+          next();
+        }
+      } catch (error) {
+        console.error('Error checking for static file:', error);
+        next();
+      }
+    });
+  }
+  
   // API route for translating a chapter
   app.post('/api/translate-chapter', async (req, res) => {
     const { url, bookNumber, chapterNumber } = req.body;
